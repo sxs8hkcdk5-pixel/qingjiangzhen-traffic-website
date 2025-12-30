@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>管理员后台 - 清江镇交通安全</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #ecf0f1; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 15px rgba(0,0,0,0.1); }
+        h1 { color: #c0392b; text-align: center; margin-bottom: 20px; }
+        .login-section, .data-section { margin-bottom: 30px; }
+        .data-section { display: none; }
+        input[type="password"], input[type="text"] { padding: 10px; margin: 5px; width: 250px; border: 1px solid #bdc3c7; border-radius: 4px; }
+        button { background-color: #27ae60; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background-color: #229954; }
+        .logout-btn { background-color: #e74c3c; }
+        .logout-btn:hover { background-color: #c0392b; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #3498db; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .search-box { margin-bottom: 15px; }
+        #searchInput { width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>清江镇交通安全数据管理后台</h1>
+        <div class="login-section" id="loginSection">
+            <h3>管理员登录</h3>
+            <p>请输入管理员密码：</p>
+            <input type="password" id="adminPassword" placeholder="输入密码">
+            <button onclick="login()">登录</button>
+            <p id="loginError" style="color:red; display:none;">密码错误！</p>
+            <p><strong>提示：</strong>初始密码是 <code>qingjiang123456</code>。登录后请及时在下方修改。</p>
+        </div>
+        <div class="data-section" id="dataSection">
+            <div style="text-align:right; margin-bottom:15px;">
+                <button class="logout-btn" onclick="logout()">退出登录</button>
+            </div>
+            <h3>所有检查登记记录</h3>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="搜索车牌、姓名或身份证...">
+                <button onclick="searchData()">搜索</button>
+                <button onclick="clearSearch()">清空搜索</button>
+                <button onclick="exportData()">导出数据(CSV)</button>
+                <button onclick="changePasswordPrompt()">修改密码</button>
+            </div>
+            <div id="dataTableContainer">
+                <!-- 表格将通过JavaScript动态加载 -->
+                <p>正在加载数据...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 登录验证和修改密码
+        const STORAGE_KEY = 'qingjiang_admin_pw';
+        let currentPassword = localStorage.getItem(STORAGE_KEY) || 'qingjiang123456';
+        function login() {
+            const input = document.getElementById('adminPassword').value;
+            if (input === currentPassword) {
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('dataSection').style.display = 'block';
+                loadAllData();
+            } else {
+                document.getElementById('loginError').style.display = 'block';
+            }
+        }
+        function logout() {
+            document.getElementById('dataSection').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'block';
+            document.getElementById('adminPassword').value = '';
+        }
+        function changePasswordPrompt() {
+            const oldPw = prompt('请输入当前密码：');
+            if (oldPw !== currentPassword) {
+                alert('当前密码错误！');
+                return;
+            }
+            const newPw = prompt('请输入新密码：');
+            if (newPw && newPw.length >= 3) {
+                currentPassword = newPw;
+                localStorage.setItem(STORAGE_KEY, newPw);
+                alert('密码修改成功！');
+            } else {
+                alert('密码无效，必须至少3位。');
+            }
+        }
+        // 数据加载、搜索和导出
+        async function loadAllData(searchTerm = '') {
+            try {
+                const response = await fetch(`/api/data?search=${encodeURIComponent(searchTerm)}`);
+                const data = await response.json();
+                renderTable(data);
+            } catch (error) {
+                document.getElementById('dataTableContainer').innerHTML = `<p style="color:red;">加载数据失败。</p>`;
+            }
+        }
+        function renderTable(records) {
+            if (records.length === 0) {
+                document.getElementById('dataTableContainer').innerHTML = `<p>没有找到记录。</p>`;
+                return;
+            }
+            let html = `<table>
+                <thead><tr>
+                    <th>提交时间</th><th>检查人</th><th>电话</th><th>身份证</th>
+                    <th>车牌</th><th>车辆类型</th><th>使用性质</th><th>备注</th>
+                </tr></thead>
+                <tbody>`;
+            records.forEach(r => {
+                html += `<tr>
+                    <td>${r.submit_time || ''}</td>
+                    <td>${r.inspector_name || ''}</td>
+                    <td>${r.phone || ''}</td>
+                    <td>${r.id_card || ''}</td>
+                    <td>${r.plate_number || ''}</td>
+                    <td>${r.vehicle_type || ''}</td>
+                    <td>${r.usage || ''}</td>
+                    <td>${r.notes || ''}</td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+            document.getElementById('dataTableContainer').innerHTML = html;
+        }
+        function searchData() {
+            const term = document.getElementById('searchInput').value;
+            loadAllData(term);
+        }
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            loadAllData('');
+        }
+        function exportData() {
+            alert('导出功能需要后端支持。当你在服务器运行Python程序后，可以访问 /api/export 来下载CSV文件。');
+        }
+        // 页面加载后检查是否已登录（示例，实际生产环境需强化安全）
+        window.onload = function() {
+            // 简单示例，不推荐在生产中用于真实认证
+            if (localStorage.getItem('isAdminLoggedIn') === 'true') {
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('dataSection').style.display = 'block';
+                loadAllData();
+            }
+        };
+    </script>
+</body>
+</html>
